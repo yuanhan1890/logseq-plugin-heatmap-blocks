@@ -1,63 +1,8 @@
-import { format, parse } from "date-fns";
-import React, { useState } from "react";
+import React from "react";
+import dayjs from "dayjs";
 import { useMountedState } from "react-use";
-import { BlockEntity, PageEntity } from "@logseq/libs/dist/LSPlugin";
 
 export const triggerIconName = "logseq-heatmap-trigger-icon";
-
-export const useAppVisible = () => {
-  const [visible, setVisible] = useState(logseq.isMainUIVisible);
-  const isMounted = useMountedState();
-  React.useEffect(() => {
-    const eventName = "ui:visible:changed";
-    const handler = async ({ visible }: any) => {
-      if (isMounted()) {
-        setVisible(visible);
-      }
-    };
-    logseq.on(eventName, handler);
-    return () => {
-      logseq.off(eventName, handler);
-    };
-  }, [isMounted]);
-  return visible;
-};
-
-export const useSidebarVisible = () => {
-  const [visible, setVisible] = useState(false);
-  const isMounted = useMountedState();
-  React.useEffect(() => {
-    logseq.App.onSidebarVisibleChanged(({ visible }) => {
-      if (isMounted()) {
-        setVisible(visible);
-      }
-    });
-  }, [isMounted]);
-  return visible;
-};
-
-export const useCurrentPage = () => {
-  const [page, setPage] = React.useState<null | PageEntity | BlockEntity>(null);
-  const setActivePage = React.useCallback(async () => {
-    const p = await logseq.Editor.getCurrentPage();
-    setPage(p);
-  }, []);
-  React.useEffect(() => {
-    setActivePage();
-    return logseq.App.onRouteChanged(setActivePage);
-  }, [setActivePage]);
-  return page;
-};
-
-export const useCurrentJournalDate = () => {
-  const page = useCurrentPage();
-  return React.useMemo(() => {
-    if (page && page["journal?"] && page.journalDay) {
-      return parseJournalDate(page.journalDay);
-    }
-    return null;
-  }, [page]);
-};
 
 export const useThemeMode = () => {
   const isMounted = useMountedState();
@@ -67,7 +12,7 @@ export const useThemeMode = () => {
       (top?.document
         .querySelector("html")
         ?.getAttribute("data-theme") as typeof mode) ??
-        (matchMedia("prefers-color-scheme: dark").matches ? "dark" : "light")
+        (matchMedia("prefers-color-scheme: dark").matches ? "dark" : "light"),
     );
     logseq.App.onThemeModeChanged((s) => {
       if (isMounted()) {
@@ -79,35 +24,33 @@ export const useThemeMode = () => {
   return mode;
 };
 
-export let displayDateFormat = "MMM do, yyyy";
+export const getLongestStreak = (
+  formattedData: { date: string; count: number }[],
+): number => {
+  const activeDates = formattedData
+    .filter((item) => item.count > 0)
+    .map((item) => dayjs(item.date).format("YYYY-MM-DD"));
 
-export async function getDisplayDateFormat() {
-  let format =
-    (await logseq.App.getUserConfigs())?.preferredDateFormat ?? "MMM do, yyyy";
+  const uniqueSortedDates = Array.from(new Set(activeDates)).sort((a, b) =>
+    dayjs(a).isBefore(dayjs(b)) ? -1 : 1,
+  );
 
-  displayDateFormat = format;
-  return format;
-}
+  if (uniqueSortedDates.length === 0) return 0;
 
-export const toDate = (d: Date | string) => {
-  if (typeof d !== "string") {
-    return d;
+  let maxStreak = 1;
+  let currentStreak = 1;
+
+  for (let i = 1; i < uniqueSortedDates.length; i++) {
+    const prevDate = dayjs(uniqueSortedDates[i - 1]);
+    const currDate = dayjs(uniqueSortedDates[i]);
+
+    if (currDate.diff(prevDate, "day") === 1) {
+      currentStreak++;
+    } else {
+      maxStreak = Math.max(maxStreak, currentStreak);
+      currentStreak = 1;
+    }
   }
-  return new Date(d);
-};
 
-export const formatAsDashed = (d: Date | string) => {
-  return format(toDate(d), "yyyy-MM-dd");
-};
-
-export const formatAsParam = (d: Date | string) => {
-  return format(toDate(d), "yyyyMMdd");
-};
-
-export const formatAsLocale = (d: Date | string) => {
-  return format(toDate(d), displayDateFormat);
-};
-
-export const parseJournalDate = (d: number) => {
-  return parse(`${d}`, "yyyyMMdd", new Date());
+  return Math.max(maxStreak, currentStreak);
 };
