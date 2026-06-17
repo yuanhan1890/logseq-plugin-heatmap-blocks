@@ -161,7 +161,6 @@ function main() {
         if (!mountNode) return;
 
         const root = createRoot(mountNode);
-
         root.render(<Calendar formattedData={formattedData} {...attributes} />);
       }, 50);
     } catch (error: any) {

@@ -2,9 +2,9 @@ import React, { CSSProperties, useEffect, useMemo, useRef } from "react";
 import CalendarHeatmap from "react-calendar-heatmap";
 import dayjs from "dayjs";
 import { Tooltip, type TooltipRefProps } from "react-tooltip";
-import { maxBy, minBy } from "lodash-es";
 import { getLongestStreak, useThemeMode } from "./utils";
 import { getInterpolatedColor } from "./color";
+import { useMemoizedFn } from "ahooks";
 
 const attrStyle: CSSProperties = {
   marginRight: "8px",
@@ -28,6 +28,77 @@ function renderTooltipTemplate(
   return template.replace(/\{(date|count)\}/g, (_, key: "date" | "count") =>
     String(data[key]),
   );
+}
+
+function findChildNode(
+  nodes: NodeListOf<ChildNode>,
+  predicate: (node: ChildNode) => boolean,
+) {
+  for (const child of nodes) {
+    if (predicate(child)) {
+      return child;
+    }
+  }
+  return null;
+}
+
+function mouseInsideRect(
+  event: React.MouseEvent<HTMLDivElement, MouseEvent>,
+  box: DOMRect,
+) {
+  const x = event.clientX;
+  const y = event.clientY;
+  return (
+    event.clientX >= box.left &&
+    event.clientX <= box.right &&
+    event.clientY >= box.top &&
+    event.clientY <= box.bottom
+  );
+}
+
+function findHoveredDay(
+  event: React.MouseEvent<HTMLDivElement, MouseEvent>,
+): SVGRectElement | undefined {
+  const containerEl = event.target as HTMLElement;
+  const svg = findChildNode(
+    containerEl.childNodes,
+    (c) => (c as SVGSVGElement).tagName === "svg",
+  );
+  if (!svg) {
+    return;
+  }
+  const svgWin = svg.ownerDocument?.defaultView || window;
+
+  const weeksEl = findChildNode((svg as SVGSVGElement).childNodes, (c) => {
+    return (
+      c instanceof svgWin.SVGElement &&
+      c.classList.contains("react-calendar-heatmap-all-weeks")
+    );
+  });
+
+  if (
+    !weeksEl ||
+    !mouseInsideRect(event, (weeksEl as SVGElement).getBoundingClientRect())
+  ) {
+    return;
+  }
+
+  for (const weekEl of weeksEl.childNodes) {
+    if (
+      weekEl instanceof svgWin.SVGGElement &&
+      mouseInsideRect(event, weekEl.getBoundingClientRect())
+    ) {
+      for (const dayEl of weekEl.childNodes) {
+        if (
+          dayEl instanceof svgWin.SVGRectElement &&
+          mouseInsideRect(event, dayEl.getBoundingClientRect())
+        ) {
+          return dayEl;
+        }
+      }
+      return;
+    }
+  }
 }
 
 export const Calendar = ({
@@ -149,73 +220,26 @@ export const Calendar = ({
       : tooltipFallbackString;
   };
 
-  useEffect(() => {
-    if (!enableTooltip) {
-      tooltipRef.current?.close();
-      return;
-    }
+  const openTooltip = useMemoizedFn((target: SVGRectElement) => {
+    const content = target.getAttribute("data-heatmap-tooltip");
+    if (!content) return;
 
-    const root = rootRef.current;
-    if (!root) return;
+    const rect = target.getBoundingClientRect();
+    activeTooltipTargetRef.current = target;
+    tooltipRef.current?.open({
+      content,
+      place: "top",
+      position: {
+        x: rect.left + rect.width / 2,
+        y: rect.top,
+      },
+    });
+  });
 
-    const rootDocument = root.ownerDocument;
-
-    const getTooltipTargetAtPoint = (event: MouseEvent | PointerEvent) => {
-      const rects = Array.from(
-        root.querySelectorAll<SVGRectElement>("rect[data-heatmap-tooltip]"),
-      );
-
-      return (
-        rects.find((rect) => {
-          const box = rect.getBoundingClientRect();
-          return (
-            event.clientX >= box.left &&
-            event.clientX <= box.right &&
-            event.clientY >= box.top &&
-            event.clientY <= box.bottom
-          );
-        }) || null
-      );
-    };
-
-    const closeTooltip = () => {
-      activeTooltipTargetRef.current = null;
-      tooltipRef.current?.close();
-    };
-
-    const openTooltip = (target: SVGRectElement) => {
-      const content = target.getAttribute("data-heatmap-tooltip");
-      if (!content) return;
-
-      const rect = target.getBoundingClientRect();
-      activeTooltipTargetRef.current = target;
-      tooltipRef.current?.open({
-        content,
-        place: "top",
-        position: {
-          x: rect.left + rect.width / 2,
-          y: rect.top,
-        },
-      });
-    };
-
-    const handlePointer = (event: MouseEvent | PointerEvent) => {
-      const target = getTooltipTargetAtPoint(event);
-      if (!target) {
-        if (activeTooltipTargetRef.current) closeTooltip();
-        return;
-      }
-
-      openTooltip(target);
-    };
-
-    rootDocument.addEventListener("mousemove", handlePointer, true);
-
-    return () => {
-      rootDocument.removeEventListener("mousemove", handlePointer, true);
-      closeTooltip();
-    };
-  }, [enableTooltip]);
+  const closeTooltip = useMemoizedFn(() => {
+    activeTooltipTargetRef.current = null;
+    tooltipRef.current?.close();
+  });
 
   const containerWidth = "100%";
   return (
@@ -223,6 +247,18 @@ export const Calendar = ({
       className="heatmap-root"
       ref={rootRef}
       style={{ width: containerWidth }}
+      onMouseMove={(event) => {
+        if (enableTooltip) {
+          const dayEl = findHoveredDay(event);
+
+          if (!dayEl) {
+            if (activeTooltipTargetRef.current) closeTooltip();
+            return;
+          }
+
+          openTooltip(dayEl);
+        }
+      }}
     >
       <div className={`p-4 ${themeMode}`} style={{ fontFamily: "sans-serif" }}>
         {title && (
