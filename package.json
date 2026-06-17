@@ -1,5 +1,6 @@
 {
   "name": "logseq-plugin-heatmap-block",
+  "title": "Heatmap Block",
   "version": "1.0.0",
   "main": "dist/index.html",
   "scripts": {

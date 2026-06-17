@@ -1,7 +1,12 @@
-import React, { CSSProperties, useMemo, useState } from "react";
+import React, {
+  CSSProperties,
+  useEffect,
+  useMemo,
+  useRef,
+} from "react";
 import CalendarHeatmap from "react-calendar-heatmap";
 import dayjs from "dayjs";
-import { Tooltip, type IPosition } from "react-tooltip";
+import { Tooltip, type TooltipRefProps } from "react-tooltip";
 import { maxBy, minBy } from "lodash-es";
 import { getLongestStreak, useThemeMode } from "./utils";
 import { getInterpolatedColor } from "./color";
@@ -15,11 +20,6 @@ const attrStyle: CSSProperties = {
 type Datum = {
   date: string;
   count: number;
-};
-
-type HeatmapTooltipState = {
-  content: string;
-  position: IPosition;
 };
 
 const NUM_WEEKS = 25;
@@ -72,8 +72,9 @@ export const Calendar = ({
   tooltipFallback?: string;
   tooltipFallbackContent?: string;
 }) => {
-  const [tooltipState, setTooltipState] =
-    useState<HeatmapTooltipState | null>(null);
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const tooltipRef = useRef<TooltipRefProps>(null);
+  const activeTooltipTargetRef = useRef<SVGRectElement | null>(null);
 
   const startDateDayjs = _startDate
     ? dayjs(_startDate, "YYYY-MM-DD")
@@ -140,9 +141,89 @@ export const Calendar = ({
     [],
   );
 
+  const getTooltipContent = (value: Datum | null) => {
+    const count = value?.count ?? 0;
+    const dateStr = value?.date ? dayjs(value.date).format("YYYY-MM-DD") : "";
+    return dateStr && count > 0
+      ? renderTooltipTemplate(tooltipTemplateString, {
+          date: dateStr,
+          count,
+        })
+      : tooltipFallbackString;
+  };
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return;
+
+    const rootDocument = root.ownerDocument;
+
+    const getTooltipTargetAtPoint = (event: MouseEvent | PointerEvent) => {
+      const rects = Array.from(
+        root.querySelectorAll<SVGRectElement>("rect[data-heatmap-tooltip]"),
+      );
+
+      return (
+        rects.find((rect) => {
+          const box = rect.getBoundingClientRect();
+          return (
+            event.clientX >= box.left &&
+            event.clientX <= box.right &&
+            event.clientY >= box.top &&
+            event.clientY <= box.bottom
+          );
+        }) || null
+      );
+    };
+
+    const closeTooltip = () => {
+      activeTooltipTargetRef.current = null;
+      tooltipRef.current?.close();
+    };
+
+    const openTooltip = (target: SVGRectElement) => {
+      const content = target.getAttribute("data-heatmap-tooltip");
+      if (!content) return;
+
+      const rect = target.getBoundingClientRect();
+      activeTooltipTargetRef.current = target;
+      tooltipRef.current?.open({
+        content,
+        place: "top",
+        position: {
+          x: rect.left + rect.width / 2,
+          y: rect.top,
+        },
+      });
+    };
+
+    const handlePointer = (event: MouseEvent | PointerEvent) => {
+      const target = getTooltipTargetAtPoint(event);
+      if (!target) {
+        if (activeTooltipTargetRef.current) closeTooltip();
+        return;
+      }
+
+      openTooltip(target);
+    };
+
+    rootDocument.addEventListener("pointerover", handlePointer, true);
+    rootDocument.addEventListener("pointermove", handlePointer, true);
+    rootDocument.addEventListener("mouseover", handlePointer, true);
+    rootDocument.addEventListener("mousemove", handlePointer, true);
+
+    return () => {
+      rootDocument.removeEventListener("pointerover", handlePointer, true);
+      rootDocument.removeEventListener("pointermove", handlePointer, true);
+      rootDocument.removeEventListener("mouseover", handlePointer, true);
+      rootDocument.removeEventListener("mousemove", handlePointer, true);
+      closeTooltip();
+    };
+  }, []);
+
   const containerWidth = "100%";
   return (
-    <div className="heatmap-root" style={{ width: containerWidth }}>
+    <div className="heatmap-root" ref={rootRef} style={{ width: containerWidth }}>
       <div className={`p-4 ${themeMode}`} style={{ fontFamily: "sans-serif" }}>
         {title && (
           <div
@@ -163,6 +244,15 @@ export const Calendar = ({
           endDate={endDate}
           values={data}
           showOutOfRangeDays
+          titleForValue={(value: Datum | null) => getTooltipContent(value)}
+          tooltipDataAttrs={(value: Datum | null) => {
+            const content = getTooltipContent(value);
+            return {
+              "data-heatmap-tooltip": content,
+              "data-tooltip-id": tooltipId,
+              "data-tooltip-content": content,
+            };
+          }}
           classForValue={(value: Datum) => {
             let classes: string[] = [];
             let level = 0;
@@ -178,9 +268,6 @@ export const Calendar = ({
           gutterSize={4}
           transformDayElement={(element, value: Datum, index) => {
             const count = value?.count ?? 0;
-            const dateStr = value?.date
-              ? dayjs(value.date).format("YYYY-MM-DD")
-              : "";
 
             let customFill: string = "";
             if (count === 0 && defaultFill) {
@@ -195,36 +282,8 @@ export const Calendar = ({
               );
             }
 
-            const showTooltip = (target: SVGRectElement) => {
-              const rect = target.getBoundingClientRect();
-              const content =
-                dateStr && count > 0
-                  ? renderTooltipTemplate(tooltipTemplateString, {
-                      date: dateStr,
-                      count,
-                    })
-                  : tooltipFallbackString;
-
-              setTooltipState({
-                content,
-                position: {
-                  x: rect.left + rect.width / 2,
-                  y: rect.top,
-                },
-              });
-            };
-
             return React.cloneElement(element, {
               rx: 3,
-              onMouseOver: (event: React.MouseEvent<SVGRectElement>) => {
-                showTooltip(event.currentTarget);
-              },
-              onMouseMove: (event: React.MouseEvent<SVGRectElement>) => {
-                showTooltip(event.currentTarget);
-              },
-              onMouseOut: () => {
-                setTooltipState(null);
-              },
               ...(customFill
                 ? { style: { ...element.props.style, fill: customFill } }
                 : {}),
@@ -233,10 +292,8 @@ export const Calendar = ({
         />
 
         <Tooltip
+          ref={tooltipRef}
           id={tooltipId}
-          content={tooltipState?.content}
-          isOpen={Boolean(tooltipState)}
-          position={tooltipState?.position}
           place="top"
           positionStrategy="fixed"
           disableStyleInjection
