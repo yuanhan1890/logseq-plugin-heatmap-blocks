@@ -1,9 +1,4 @@
-import React, {
-  CSSProperties,
-  useEffect,
-  useMemo,
-  useRef,
-} from "react";
+import React, { CSSProperties, useEffect, useMemo, useRef } from "react";
 import CalendarHeatmap from "react-calendar-heatmap";
 import dayjs from "dayjs";
 import { Tooltip, type TooltipRefProps } from "react-tooltip";
@@ -166,15 +161,6 @@ export const Calendar = ({
     const rootDocument = root.ownerDocument;
 
     const getTooltipTargetAtPoint = (event: MouseEvent | PointerEvent) => {
-      const rootBox = root.getBoundingClientRect();
-      const isInsideRoot =
-        event.clientX >= rootBox.left &&
-        event.clientX <= rootBox.right &&
-        event.clientY >= rootBox.top &&
-        event.clientY <= rootBox.bottom;
-
-      if (!isInsideRoot) return null;
-
       const rects = Array.from(
         root.querySelectorAll<SVGRectElement>("rect[data-heatmap-tooltip]"),
       );
@@ -223,17 +209,21 @@ export const Calendar = ({
       openTooltip(target);
     };
 
-    rootDocument.addEventListener("pointerover", handlePointer, true);
+    rootDocument.addEventListener("mousemove", handlePointer, true);
 
     return () => {
-      rootDocument.removeEventListener("pointerover", handlePointer, true);
+      rootDocument.removeEventListener("mousemove", handlePointer, true);
       closeTooltip();
     };
   }, [enableTooltip]);
 
   const containerWidth = "100%";
   return (
-    <div className="heatmap-root" ref={rootRef} style={{ width: containerWidth }}>
+    <div
+      className="heatmap-root"
+      ref={rootRef}
+      style={{ width: containerWidth }}
+    >
       <div className={`p-4 ${themeMode}`} style={{ fontFamily: "sans-serif" }}>
         {title && (
           <div

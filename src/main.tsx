@@ -8,26 +8,9 @@ import { provideStyle } from "./provideStyle";
 import { provideTooltipStyle } from "./provideTooltipStyle";
 import { groupBy, map, mapValues, sumBy } from "lodash-es";
 
-const mountedRoots = new Map<string, Root>();
-const pendingMountTimers = new Map<string, number>();
-
 function main() {
   const pluginId = logseq.baseInfo.id;
   console.info(`#${pluginId}: MAIN`);
-
-  function disposeRenderer(key: string) {
-    const timer = pendingMountTimers.get(key);
-    if (timer) {
-      window.clearTimeout(timer);
-      pendingMountTimers.delete(key);
-    }
-
-    const root = mountedRoots.get(key);
-    if (root) {
-      root.unmount();
-      mountedRoots.delete(key);
-    }
-  }
 
   function parseCodeBlock(content: string): string {
     const trimmed = content.trim();
@@ -106,7 +89,6 @@ function main() {
     const queryString = parseCodeBlock(rawContent);
 
     if (!queryString) {
-      disposeRenderer(heatmapId);
       logseq.provideUI({
         key: `${heatmapId}`,
         slot,
@@ -167,7 +149,6 @@ function main() {
 
       const containerId = `heatmap-root-${slot}`;
 
-      disposeRenderer(heatmapId);
       logseq.provideUI({
         key: `${heatmapId}`,
         slot,
@@ -175,21 +156,16 @@ function main() {
         template: `<div id="${containerId}" data-on-macro-staged="true"></div>`,
       });
 
-      const mountTimer = window.setTimeout(() => {
-        pendingMountTimers.delete(heatmapId);
-
+      setTimeout(() => {
         const mountNode = parent.document.getElementById(containerId);
         if (!mountNode) return;
 
         const root = createRoot(mountNode);
-        mountedRoots.set(heatmapId, root);
 
         root.render(<Calendar formattedData={formattedData} {...attributes} />);
       }, 50);
-      pendingMountTimers.set(heatmapId, mountTimer);
     } catch (error: any) {
       console.error("[Heatmap Query Error]:", error);
-      disposeRenderer(heatmapId);
       logseq.provideUI({
         key: `${heatmapId}`,
         slot,
