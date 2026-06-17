@@ -166,6 +166,15 @@ export const Calendar = ({
     const rootDocument = root.ownerDocument;
 
     const getTooltipTargetAtPoint = (event: MouseEvent | PointerEvent) => {
+      const rootBox = root.getBoundingClientRect();
+      const isInsideRoot =
+        event.clientX >= rootBox.left &&
+        event.clientX <= rootBox.right &&
+        event.clientY >= rootBox.top &&
+        event.clientY <= rootBox.bottom;
+
+      if (!isInsideRoot) return null;
+
       const rects = Array.from(
         root.querySelectorAll<SVGRectElement>("rect[data-heatmap-tooltip]"),
       );
@@ -215,15 +224,9 @@ export const Calendar = ({
     };
 
     rootDocument.addEventListener("pointerover", handlePointer, true);
-    rootDocument.addEventListener("pointermove", handlePointer, true);
-    rootDocument.addEventListener("mouseover", handlePointer, true);
-    rootDocument.addEventListener("mousemove", handlePointer, true);
 
     return () => {
       rootDocument.removeEventListener("pointerover", handlePointer, true);
-      rootDocument.removeEventListener("pointermove", handlePointer, true);
-      rootDocument.removeEventListener("mouseover", handlePointer, true);
-      rootDocument.removeEventListener("mousemove", handlePointer, true);
       closeTooltip();
     };
   }, [enableTooltip]);
