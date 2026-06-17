@@ -23,6 +23,9 @@
 | showActiveDays   | boolean? | 展示总天数  |
 | showPeakDays   | boolean? | 展示单天最大次数 |
 | showLongestStreak   | boolean? | 展示最长连续活跃天数 |
+| enableTooltip   | boolean? | 是否启用热力图单元格 tooltip，默认为 `true` |
+| tooltipContentTemplate   | string? | 有记录日期的 tooltip 内容模版，支持 `{date}` 和 `{count}`，默认为 `"{date}: {count} times"` |
+| tooltipFallback   | string? | 无记录日期的 tooltip 内容，默认为 `"无记录"` |
 
 
 ## Demo
@@ -50,6 +53,9 @@
 {
   "title": "📓✨✍️",
   "startDate": "2026-01-01",
-  "endDate": "2026-12-31"
+  "endDate": "2026-12-31",
+  "enableTooltip": true,
+  "tooltipContentTemplate": "{date}: {count} times",
+  "tooltipFallback": "无记录"
 }
 ```

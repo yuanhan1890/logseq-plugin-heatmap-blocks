@@ -49,6 +49,7 @@ export const Calendar = ({
   showActiveDays = true,
   showPeakDay = true,
   showLongestStreak = true,
+  enableTooltip = true,
   tooltipContentTemplate,
   tooltipTemplate,
   tooltipFallback = DEFAULT_TOOLTIP_FALLBACK,
@@ -67,6 +68,7 @@ export const Calendar = ({
   showActiveDays?: boolean;
   showPeakDay?: boolean;
   showLongestStreak?: boolean;
+  enableTooltip?: boolean;
   tooltipContentTemplate?: string;
   tooltipTemplate?: string;
   tooltipFallback?: string;
@@ -153,6 +155,11 @@ export const Calendar = ({
   };
 
   useEffect(() => {
+    if (!enableTooltip) {
+      tooltipRef.current?.close();
+      return;
+    }
+
     const root = rootRef.current;
     if (!root) return;
 
@@ -219,7 +226,7 @@ export const Calendar = ({
       rootDocument.removeEventListener("mousemove", handlePointer, true);
       closeTooltip();
     };
-  }, []);
+  }, [enableTooltip]);
 
   const containerWidth = "100%";
   return (
@@ -244,15 +251,23 @@ export const Calendar = ({
           endDate={endDate}
           values={data}
           showOutOfRangeDays
-          titleForValue={(value: Datum | null) => getTooltipContent(value)}
-          tooltipDataAttrs={(value: Datum | null) => {
-            const content = getTooltipContent(value);
-            return {
-              "data-heatmap-tooltip": content,
-              "data-tooltip-id": tooltipId,
-              "data-tooltip-content": content,
-            };
-          }}
+          titleForValue={
+            enableTooltip
+              ? (value: Datum | null) => getTooltipContent(value)
+              : undefined
+          }
+          tooltipDataAttrs={
+            enableTooltip
+              ? (value: Datum | null) => {
+                  const content = getTooltipContent(value);
+                  return {
+                    "data-heatmap-tooltip": content,
+                    "data-tooltip-id": tooltipId,
+                    "data-tooltip-content": content,
+                  };
+                }
+              : undefined
+          }
           classForValue={(value: Datum) => {
             let classes: string[] = [];
             let level = 0;
@@ -291,13 +306,15 @@ export const Calendar = ({
           }}
         />
 
-        <Tooltip
-          ref={tooltipRef}
-          id={tooltipId}
-          place="top"
-          positionStrategy="fixed"
-          disableStyleInjection
-        />
+        {enableTooltip && (
+          <Tooltip
+            ref={tooltipRef}
+            id={tooltipId}
+            place="top"
+            positionStrategy="fixed"
+            disableStyleInjection
+          />
+        )}
 
         {showSummary && summary && (
           <div

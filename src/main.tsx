@@ -6,7 +6,6 @@ import { createRoot } from "react-dom/client";
 import { Calendar } from "./Calendar";
 import { provideStyle } from "./provideStyle";
 import { provideTooltipStyle } from "./provideTooltipStyle";
-import { TooltipButton } from "./TooltipButton";
 import { groupBy, map, mapValues, sumBy } from "lodash-es";
 
 function main() {
@@ -66,49 +65,15 @@ function main() {
     }
   });
 
-  logseq.Editor.registerSlashCommand("Tooltip Button", async () => {
-    await logseq.Editor.insertAtEditingCursor(
-      "{{renderer :tooltip-button, Hover me, Tooltip rendered by react-tooltip}}",
-    );
-  });
-
   provideStyle();
   provideTooltipStyle();
 
   logseq.App.onMacroRendererSlotted(async ({ slot, payload }) => {
     const uuid = payload.uuid;
-    const [type, label, tooltip] = payload.arguments;
+    const [type] = payload.arguments;
     if (!type) return;
 
     const macroType = type.replace(/^:/, "");
-    if (macroType === "tooltip-button") {
-      const tooltipButtonId = `tooltip-button_${uuid}_${slot}`;
-      const containerId = `tooltip-button-root-${slot}`;
-
-      logseq.provideUI({
-        key: tooltipButtonId,
-        slot,
-        reset: true,
-        template: `<span id="${containerId}" data-on-macro-staged="true"></span>`,
-      });
-
-      setTimeout(() => {
-        const mountNode = parent.document.getElementById(containerId);
-        if (!mountNode) return;
-
-        const root = createRoot(mountNode);
-
-        root.render(
-          <TooltipButton
-            tooltipId={`tooltip-${slot}`}
-            label={label?.trim() || undefined}
-            tooltip={tooltip?.trim() || undefined}
-          />,
-        );
-      }, 50);
-      return;
-    }
-
     const heatmapId = `heatmap_${uuid}_${slot}`;
     if (!macroType.startsWith("heatmap")) return;
 

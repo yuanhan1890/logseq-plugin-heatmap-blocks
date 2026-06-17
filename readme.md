@@ -8,16 +8,6 @@ This plugin renders a heatmap based on a provided data query and offers minor st
 
 Type `/Heatmap` to automatically generate a data query that tracks the content of a specific block reference across each daily log, along with a JSON code block where you can write your chart parameters.
 
-### React tooltip button example
-
-Type `/Tooltip Button` to insert a renderer macro that mounts a React button through `logseq.App.onMacroRendererSlotted`.
-
-```text
-{{renderer :tooltip-button, Hover me, Tooltip rendered by react-tooltip}}
-```
-
-The example uses the open-source [`react-tooltip`](https://github.com/ReactTooltip/react-tooltip) package. The button passes tooltip metadata with `data-tooltip-id` and `data-tooltip-content`, then renders `<Tooltip />` from React so the tooltip appears when the user hovers or focuses the button.
-
 For the query results, the plugin will attempt to parse whether they contain numbers. If parsing fails, it will default to a count of `1`, and then aggregate the total for that day.
 
 | Parameter | Type | Description |
@@ -35,6 +25,7 @@ For the query results, the plugin will attempt to parse whether they contain num
 | showActiveDays | boolean? | Display total number of active days |
 | showPeakDays | boolean? | Display maximum count in a single day |
 | showLongestStreak | boolean? | Display the longest continuous active streak |
+| enableTooltip | boolean? | Enable heatmap cell tooltip. Defaults to `true` |
 | tooltipContentTemplate | string? | Tooltip content template for recorded days. Supports `{date}` and `{count}`. Defaults to `"{date}: {count} times"` |
 | tooltipFallback | string? | Tooltip content for days without records. Defaults to `"无记录"` |
 
@@ -65,6 +56,7 @@ For the query results, the plugin will attempt to parse whether they contain num
   "title": "📓✨✍️",
   "startDate": "2026-01-01",
   "endDate": "2026-12-31",
+  "enableTooltip": true,
   "tooltipContentTemplate": "{date}: {count} times",
   "tooltipFallback": "无记录"
 }
